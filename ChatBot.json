@@ -1,0 +1,228 @@
+{
+  "name": "ChatBot",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fd56b609-9fa9-4c5a-a126-ddf2237b0f52",
+      "name": "Chat",
+      "webhookId": "89faf57b-9ac7-4fdb-a94e-a7e7ed564588"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4o",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        176,
+        208
+      ],
+      "id": "e5a2d5a2-e27a-4001-8243-f0db2df8a429",
+      "name": "GPT 4o",
+      "retryOnFail": true,
+      "credentials": {
+        "openRouterApi": {
+          "id": "M3nyiKHAXJnKg382",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Use this tool to search in the knowledge base.",
+        "tableName": {
+          "__rl": true,
+          "value": "knowledge_base_contents",
+          "mode": "list",
+          "cachedResultName": "knowledge_base_contents"
+        },
+        "topK": 20,
+        "includeDocumentMetadata": false,
+        "options": {
+          "queryName": "match_documents",
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "client_id",
+                "value": "={{ $('Chat').item.json.metadata.client_id }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        576,
+        208
+      ],
+      "id": "807d1458-60fd-4571-8990-62d499a54509",
+      "name": "Knowledge Base",
+      "credentials": {
+        "supabaseApi": {
+          "id": "P0Q1y2wN34Mf1uB3",
+          "name": "Supabase Patient Clicks"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-large",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        416
+      ],
+      "id": "71f6cfeb-6fb8-486e-94bc-d1b43c1b505c",
+      "name": "text-embedding-3-large",
+      "retryOnFail": true,
+      "credentials": {
+        "openAiApi": {
+          "id": "iHCUVgeHtYOE7QkE",
+          "name": "OpenAi N8N Account (PC Internal)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Chat').item.json.sessionId }}",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        320,
+        208
+      ],
+      "id": "b642aff1-ada9-4cba-85db-a94080dba5b8",
+      "name": "Previous Messages",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput || \"Hello\"}}",
+        "options": {
+          "systemMessage": "=# Overview:\nYou are a helpful website support assistant. Your job is to answer the queries of the user using the data from knowledge base.\n\n## Knowledge Source:\nYou MUST use the Knowledge Base tool to answer all user questions.\n\n## Tools:\n**Knowledge Base**: Use this tool to seach the answer of user query Always use this tool to search in the knowledge base before answering.\n\n## Rules:\n1) ALWAYS call the Knowledge Base tool before answering.\n2) Use only the information returned from the knowledge base.\n3) If information is not available or not present in knowledge base, respond naturally and user-facing. Do not tell that \"the information is not present in the knowledge base\" or \"I do not have this information\" or \"currently there is nor information about this\" Just delince politely. Do not tell that you have a knowledge base or any knowledge resource.\n4) Add call to action at the end of message.\n\n## Call to Action:\n1) After answering the user’s question, always add a short call to action.\n2) Encourage the user to book an appointment or contact the business.\n3) Use booking links or phone numbers only if available in the Knowledge Base.\n4) Embed links naturally within the sentence.\n\n## Formatting Answer:\n1) Use Markdown for readability. Headings, bullet points, and links are allowed.\n2) DO NOT use symbols.\n3) Break content into sections with headings when necessary.\n4) Start new lines for each point or step.\n5) Write phone numbers as plain text (example: 416-900-6653).\n6) Write URLs as clickable links inside text using HTML or Markdown.\n7) If the Knowledge Base content contains Markdown, you must convert it into clean plain text.\n8) Must use proper paragraphing\n9) Do not write extremely long paragraphs; break into lines and sections.\n10) Place the call to action in a new paragraph at the end of the answer.\n\n## Style:\n1) Keep answers clean, simple, and readable.\n2) No emojis.\n\n# Examples\n\n### Example 1\n\nInput:\nWhat services do you offer\n\nAction:\nUse the Knowledge Base tool.\n\nOutput:  \nWe/[Company Name] offers a range of services\n\nservice 1  \nservice 2  \nservice 3  \nservice 4\n\nIf you would like to book an appointment, you can do so online at [booking link or domain here if available] or contact their team at [contact number here if available] for assistance.\n\n### Example 2\n\nInput:\nWhere are you located?\n\nAction:\nUse the Knowledge Base tool.\n\nOutput:  \n[Company Name] is located at [Location]\n\nIf you are planning a visit, you can book an appointment online at [booking link or domain here if available] or reach out to their team at [contact number here if available] for more information.\n\n### Example 3\n\nInput:\nDo you sell car accessories?\n\nAction:\nUse the Knowledge Base tool.\n\n(If information is not present)  \nOutput:  \nWe do not sell car accessories. we only sell cars.\n\nIf you are planning a visit, you can book an appointment online at [booking link or domain here if available] or reach out to their team at [contact number here if available] for more information."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        304,
+        0
+      ],
+      "id": "69512249-26a5-4381-a2c6-020f7dc70bb8",
+      "name": "ChatBot Agent",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "content": "## Overview\n\n- This workflow handles user conversations coming from the website chat widget.\n- It is triggered whenever a user sends a message through the chat interface.\n\n## How it works\n\n- The chat widget sends the user message along with a session ID and client ID.\n- The conversation is retrieved from simple memory using the session ID.\n- The user’s message is sent to the AI agent.\n- The agent queries the knowledge base using the client ID to find relevant information.\n- A response is generated based only on the knowledge base content.\n- The conversation is stored back into simple memory for future context.\n- The formatted response is returned to the chat widget and shown to the user.",
+        "height": 544,
+        "width": 416
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -512,
+        -80
+      ],
+      "typeVersion": 1,
+      "id": "67e0cc81-b193-471a-b0fc-62bc23ee2e68",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat": {
+      "main": [
+        [
+          {
+            "node": "ChatBot Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT 4o": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "ChatBot Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Base": {
+      "ai_tool": [
+        [
+          {
+            "node": "ChatBot Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "text-embedding-3-large": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Knowledge Base",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Previous Messages": {
+      "ai_memory": [
+        [
+          {
+            "node": "ChatBot Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChatBot Agent": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "sVQkmMB3SK6Sub4d"
+  },
+  "versionId": "d176cffe-db4d-4c79-80e3-c226d31f1734",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "43fdc4c0ab73fda698a9f2922b57105f2719afb9285814bdf9ce1aaa3267e374"
+  },
+  "id": "seULpVvDNXH6GVQj",
+  "tags": []
+}

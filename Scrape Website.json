@@ -1,0 +1,827 @@
+{
+  "name": "Scrape Website",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -304,
+        -176
+      ],
+      "id": "9af4b6aa-edde-4934-bc37-555871f0c77b",
+      "name": "Start Execution"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Wait 1 Minute').last().json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer fc-36be16713beb44ce8e1a58d02fd7f082"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1088,
+        0
+      ],
+      "id": "c443c95f-cce9-41cf-8e8c-c14ef9a2b1d7",
+      "name": "Get Crawled Data",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v2/crawl",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer fc-36be16713beb44ce8e1a58d02fd7f082"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"url\": \"{{ $('Start Execution').item.json.website_url }}\",\n    \"sitemap\": \"include\",\n    \"crawlEntireDomain\": true,\n    \"scrapeOptions\": {\n        \"onlyMainContent\": true,\n        \"maxAge\": 172800000,\n        \"formats\": [\n            \"markdown\"\n        ]\n      }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        624,
+        0
+      ],
+      "id": "f022f3f6-7d9d-49b5-a5f4-d3b4302f770b",
+      "name": "Start Website Crawl",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1744,
+        0
+      ],
+      "id": "4ba480a7-7789-429d-965e-eb9b15de4640",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/embeddings ",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openRouterApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "openai/text-embedding-3-large"
+            },
+            {
+              "name": "input",
+              "value": "={{ $json.context_text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2656,
+        0
+      ],
+      "id": "16ae5e32-e478-4569-91b4-120318fa2440",
+      "name": "Make Embeddings",
+      "retryOnFail": true,
+      "credentials": {
+        "openRouterApi": {
+          "id": "M3nyiKHAXJnKg382",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "knowledge_base_contents",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $('Format Page Data').item.json.client_id }}"
+            },
+            {
+              "fieldId": "source_type",
+              "fieldValue": "website"
+            },
+            {
+              "fieldId": "page_url",
+              "fieldValue": "={{ $('Format Page Data').item.json.page_url }}"
+            },
+            {
+              "fieldId": "content",
+              "fieldValue": "={{ $('Format Page Data').item.json.context_text }}"
+            },
+            {
+              "fieldId": "embeddings",
+              "fieldValue": "={{ $json.data[0].embedding }}"
+            },
+            {
+              "fieldId": "is_deleted",
+              "fieldValue": "FALSE"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2864,
+        0
+      ],
+      "id": "8ddc769a-e6cb-463a-ac87-3d923f2f12ca",
+      "name": "Create a row",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "P0Q1y2wN34Mf1uB3",
+          "name": "Supabase Patient Clicks"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $input.first().json.markdown || \"\";\n\n// Remove skip links\nlet cleaned = text.replace(/\\[Skip to content.*?\\]\\(.*?\\)/gi, \"\");\n\n// Remove phone numbers\n// cleaned = cleaned.replace(/(\\+?\\d[\\d\\s\\-().]{7,})/g, \"\");\n\n// Remove address blocks\n// cleaned = cleaned.replace(/\\d+.*?(Street|St\\.|Road|Rd\\.|Avenue|Ave\\.|Canada|ON|CA)/gi, \"\");\n\n// Remove CTA phrases\n// const ctas = [\n//   \"Book An Appointment\",\n//   \"Call Us\",\n//   \"Contact Us\",\n//   \"Get Started\",\n//   \"Request Appointment\"\n// ];\n\n// ctas.forEach(cta => {\n//   const regex = new RegExp(cta, \"gi\");\n//   cleaned = cleaned.replace(regex, \"\");\n// });\n\n// Remove nav-style bullet lists\ncleaned = cleaned.replace(/^\\s*[-*].*$/gm, \"\");\n\n// Collapse whitespace\ncleaned = cleaned.replace(/\\n{3,}/g, \"\\n\\n\").trim();\n\nreturn {\n  cleaned_text: cleaned,\n  metadata: $input.first().json.metadata,\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        0
+      ],
+      "id": "125e3bd3-f0a9-4278-a0ae-6af8955eea16",
+      "name": "Clean Pipeline 1"
+    },
+    {
+      "parameters": {
+        "jsCode": "let text = $input.first().json.cleaned_text || \"\";\n\n// 1. Remove images (markdown + base64 placeholders)\ntext = text.replace(/!\\[.*?\\]\\(.*?\\)/g, \"\");\ntext = text.replace(/<Base64-Image-Removed>/g, \"\");\n\n// 2. Remove empty or broken links\ntext = text.replace(/\\[\\s*\\]\\(.*?\\)/g, \"\");\ntext = text.replace(/\\[\\s*\\]/g, \"\");\n\n// 3. Remove tel:, mailto:, map links\n// text = text.replace(/\\(tel:.*?\\)/gi, \"\");\n// text = text.replace(/\\(mailto:.*?\\)/gi, \"\");\ntext = text.replace(/\\(https:\\/\\/maps\\.app\\.goo\\.gl\\/.*?\\)/gi, \"\");\n\n// 4. Remove social media links\n// text = text.replace(/\\[Facebook.*?\\)|\\[Twitter.*?\\)|\\[Instagram.*?\\)|\\[YouTube.*?\\)/gi, \"\");\n\n// 5. Remove CTA phrases\n// const ctas = [\n//   \"Book an Appointment\",\n//   \"Book Now\",\n//   \"Call Us\",\n//   \"Please call us\",\n//   \"book online\",\n//   \"Complimentary Phone Consult\"\n// ];\n\n// ctas.forEach(cta => {\n//   text = text.replace(new RegExp(cta, \"gi\"), \"\");\n// });\n\n// 6. Remove footer sections\n// text = text.replace(/©.*$/gims, \"\");\n// text = text.replace(/All rights reserved.*$/gims, \"\");\n// text = text.replace(/Location\\s+Ace Physio.*$/gims, \"\");\n\n// 7. Remove long directory-style lists\n// text = text.replace(/## Areas We Serve[\\s\\S]*?##/gi, \"## \");\n// text = text.replace(/## Insurance Partners[\\s\\S]*?##/gi, \"## \");\n\n// 8. Normalize whitespace\ntext = text.replace(/\\n{3,}/g, \"\\n\\n\").trim();\n\nreturn {\n  cleaned_text: text,\n  metadata: $input.first().json.metadata,\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        0
+      ],
+      "id": "d360bc35-ff59-435f-b443-9259224e5230",
+      "name": "Clean Pipeline 2"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.first().json.data"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        0
+      ],
+      "id": "abf1397e-7dd2-4cb9-955f-ebff870c341b",
+      "name": "Format Website Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// chunk size in words\nconst CHUNK_WORDS = 1500;\n\n// function to split text into chunks\nfunction chunkText(text, size) {\n  const words = text.split(/\\s+/);\n  const chunks = [];\n  for (let i = 0; i < words.length; i += size) {\n    chunks.push(words.slice(i, i + size).join(\" \"));\n  }\n  return chunks;\n}\n\nconst items = [];\n\nfor (const page of $input.all()) {\n  const url = $input.first().json.metadata.url;\n  const title = $input.first().json.metadata.title || \"\";\n  const content = $input.first().json.cleaned_text || \"\";\n\n  // create chunks\n  const chunks = chunkText(content, CHUNK_WORDS);\n\n  // output each chunk as separate item\n  for (const chunk of chunks) {\n    items.push({\n      json: {\n        client_id: $('Start Execution').first().json.client_id,\n        source_type: \"website\",\n        page_url: url,\n        page_name: title,\n        context_text: chunk\n      }\n    });\n  }\n}\n\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2416,
+        0
+      ],
+      "id": "73d18fa9-3d0c-49e6-bfc1-6ff1264a0f23",
+      "name": "Format Page Data"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3072,
+        0
+      ],
+      "id": "80417969-e80d-4f27-9462-219c6e8f5ede",
+      "name": "Wait 2 Seconds",
+      "webhookId": "3d838bbf-1958-46a2-9cab-36e5230520cd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b135448c-d263-4be8-a05a-3b1954de1859",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1296,
+        0
+      ],
+      "id": "cca2f2cd-9ac1-49ac-8e57-9e1e1e59b48d",
+      "name": "Check if crawled is completed or not"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "knowledge_base_contents",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "client_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.client_id }}"
+            },
+            {
+              "keyName": "source_type",
+              "condition": "eq",
+              "keyValue": "website"
+            },
+            {
+              "keyName": "is_deleted",
+              "condition": "is",
+              "keyValue": "TRUE"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1744,
+        -560
+      ],
+      "id": "1639da77-85a2-4acc-bc99-03350dedc343",
+      "name": "Delete Outdated Data",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "P0Q1y2wN34Mf1uB3",
+          "name": "Supabase Patient Clicks"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "knowledge_base_contents",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "client_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.client_id }}"
+            },
+            {
+              "keyName": "source_type",
+              "condition": "eq",
+              "keyValue": "website"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "is_deleted",
+              "fieldValue": "TRUE"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        352,
+        0
+      ],
+      "id": "1edefb46-a06f-4b7d-ba94-ca457d090db1",
+      "name": "Update Outdated Data",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "P0Q1y2wN34Mf1uB3",
+          "name": "Supabase Patient Clicks"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4aa99a10-9b91-44e8-a33b-84cc64956b75",
+              "leftValue": "={{ $json.website_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "a6d080d1-7952-413a-9479-dac680201f03",
+              "leftValue": "={{ $json.client_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "dateTime",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        96,
+        0
+      ],
+      "id": "ac1c071c-c898-46c6-b1f0-fc06a1ae535f",
+      "name": "Check If Website URL Exists or Not"
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        0
+      ],
+      "id": "625aa683-6026-4c71-acb3-49ca6236ad06",
+      "name": "Wait 1 Minute",
+      "webhookId": "3654f439-bd17-4433-9f9c-68d5de5cdfa6"
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1536,
+        144
+      ],
+      "id": "12fdfd00-9d16-4188-9171-1e283585a640",
+      "name": "Wait 20 Seconds",
+      "webhookId": "7315bc8d-e14b-4724-8067-ea402451f833"
+    },
+    {
+      "parameters": {
+        "content": "## Step 1\n\nMark the  is_deleted field of previous data as TRUE to delete it after the new scraped data is inserted into DB",
+        "height": 368,
+        "width": 294,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        256,
+        -176
+      ],
+      "typeVersion": 1,
+      "id": "976c49ab-e0b2-48ae-afa3-ae4c35c003ca",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Step 2\n\n- Crawl the client's complete website\n- Get the crawled data\n- Format the cralwed data for further processing",
+        "height": 368,
+        "width": 656,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        576,
+        -176
+      ],
+      "typeVersion": 1,
+      "id": "1904a780-9a8d-45d6-ba71-94edf3e1d5a8",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Run this whole pipeline for each page of website",
+        "height": 400,
+        "width": 1568,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1680,
+        -192
+      ],
+      "typeVersion": 1,
+      "id": "d6a0be2e-1281-4b21-9e25-657d0e39e22a",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Step 3\n\nClean the crawled data of page and make its small chunks for processing",
+        "height": 320,
+        "width": 528,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2016,
+        -128
+      ],
+      "typeVersion": 1,
+      "id": "9418d333-2017-479c-98e5-7752c33437ba",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Step 4\n\nMake embeddings of each chunk and store it into the knowledge_base_contents table in DB",
+        "height": 320,
+        "width": 432,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2592,
+        -128
+      ],
+      "typeVersion": 1,
+      "id": "bd4f6abb-cb75-4c92-8b4a-715f0b7c9be1",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Step 5\n\nDelete the outdated data from knwoledge base",
+        "height": 288,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1680,
+        -688
+      ],
+      "typeVersion": 1,
+      "id": "a7e3420d-053a-4f5a-8757-42f48d4a7fe4",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "formTitle": "Client Data",
+        "formDescription": "Enter the client data to scrape the website and update the client's knowledge base",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "client_id",
+              "placeholder": "Enter the cliend id",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "website_url",
+              "placeholder": "Enter the url of client's website",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -304,
+        176
+      ],
+      "id": "8c955177-e4d3-4f06-8656-53497cbdca17",
+      "name": "On form submission",
+      "webhookId": "82e3e8ad-eb92-403d-9323-c403c98094a6"
+    },
+    {
+      "parameters": {
+        "content": "## Overview\n\n- This workflow is responsible for scraping the client’s website and updating the knowledge base.\n- It can be triggered by \"Get Clients\" Workflow or run manually by filling the form when needed.\n\n## How it works\n\n- The workflow receives the client details, including the client ID and website URL to scrape.\n- All existing knowledge base records for the client are first marked as deleted.\n- The website pages are then scraped using Firecrawl.\n- The scraped content is cleaned and processed.\n- Text embeddings are generated for the cleaned content.\n- The new content and embeddings are stored in Supabase as the updated knowledge base.\n- After the new data is successfully inserted, all previously marked deleted records for the client are permanently removed.\n\n## Setup\n\n- Place the Firecrawl API key in the \"Start Website Crawl\" and \"Get Crawled Data\"",
+        "height": 688,
+        "width": 480
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -880,
+        -240
+      ],
+      "typeVersion": 1,
+      "id": "e7a51e10-43b6-4633-befa-cde764c797ac",
+      "name": "Sticky Note6"
+    }
+  ],
+  "pinData": {
+    "Start Execution": [
+      {
+        "json": {
+          "row_number": 2,
+          "client_id": 12345,
+          "target_location": "Toronto, Ontario",
+          "website_url": "https://acephysio.ca/",
+          "email_address": "content@patientclicks.ca",
+          "google_drive_folder_link": "https://drive.google.com/drive/u/1/folders/1l0TUEZDyn9e2A8b5pOVyyXHY01xMV8o2",
+          "blog_sitemap_url": "https://acephysio.ca/post-sitemap.xml",
+          "cta_preference": "Book Appointment",
+          "brand_tone": "Professional, personalized, and results-driven. Modern and innovative with a confident clinical voice, but warm, supportive, and easy to understand. Speaks directly to the patient, focuses on outcomes and recovery, and emphasizes trust, expertise, and convenience. Clear, concise, urban-professional tone with reassurance, optimism, and a strong emphasis on evidence-based care and tailored treatment.",
+          "writing_guidelines": "Avoid fluff, speak clearly, use first person tone. ",
+          "compliance_rules": "Avoid medical guarantees or absolute claims. Do not use the words \"expert\", “cure,” “heal,” “fix,” “eliminate,” or “guaranteed.” Avoid diagnostic or prescriptive language (e.g., “treats,” “diagnoses”). Do not use testimonials, patient success stories, or superiority claims. No restricted terms such as \"diagnose\", \"expert\", \"specialize\", \"specialized\", “biofeedback,” “proven,” or “best.” Use supportive, non-absolute phrasing like “may help” or “can support.” Maintain a professional, factual, regulation-safe tone.",
+          "drive_folder_id": "1l0TUEZDyn9e2A8b5pOVyyXHY01xMV8o2",
+          "brand_name": "Ace Physio",
+          "monthly_blog_limit": 4,
+          "service_page_sample_url": "https://acephysio.ca/services/laser-therapy-downtown-toronto/",
+          "booking_url": "https://acephysio.janeapp.com/",
+          "phone_number": "(416) 900-6653"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "On form submission": [
+      {
+        "json": {
+          "client_id": "12345",
+          "website_url": "https://acephysio.ca/",
+          "submittedAt": "2026-02-02T09:00:05.508-05:00",
+          "formMode": "test"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Start Execution": {
+      "main": [
+        [
+          {
+            "node": "Check If Website URL Exists or Not",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Website Crawl": {
+      "main": [
+        [
+          {
+            "node": "Wait 1 Minute",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Crawled Data": {
+      "main": [
+        [
+          {
+            "node": "Check if crawled is completed or not",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Delete Outdated Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clean Pipeline 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Wait 2 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Pipeline 1": {
+      "main": [
+        [
+          {
+            "node": "Clean Pipeline 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Pipeline 2": {
+      "main": [
+        [
+          {
+            "node": "Format Page Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Website Data": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Page Data": {
+      "main": [
+        [
+          {
+            "node": "Make Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if crawled is completed or not": {
+      "main": [
+        [
+          {
+            "node": "Format Website Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 20 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Outdated Data": {
+      "main": [
+        [
+          {
+            "node": "Start Website Crawl",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Website URL Exists or Not": {
+      "main": [
+        [
+          {
+            "node": "Update Outdated Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 1 Minute": {
+      "main": [
+        [
+          {
+            "node": "Get Crawled Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 20 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Get Crawled Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Check If Website URL Exists or Not",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "sVQkmMB3SK6Sub4d"
+  },
+  "versionId": "0c6cda22-1134-4944-96ff-4ff161ab696f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "43fdc4c0ab73fda698a9f2922b57105f2719afb9285814bdf9ce1aaa3267e374"
+  },
+  "id": "qExnmzSSQaAaNclI",
+  "tags": []
+}

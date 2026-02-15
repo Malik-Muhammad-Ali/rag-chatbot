@@ -1,0 +1,243 @@
+{
+  "name": "Get Clients",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -208,
+        144
+      ],
+      "id": "a71a116e-beed-4c92-9481-cf9786b895a6",
+      "name": "Weekly Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1wZbx_ifZ3NcxB7o85flrfS5R41kO7VR9QGXzoub91R4",
+          "mode": "list",
+          "cachedResultName": "ClientProfiles",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wZbx_ifZ3NcxB7o85flrfS5R41kO7VR9QGXzoub91R4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wZbx_ifZ3NcxB7o85flrfS5R41kO7VR9QGXzoub91R4/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        128,
+        0
+      ],
+      "id": "aed5e4e2-3bea-4155-863d-336961f44b55",
+      "name": "Get Clients",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ISu8nb3aKK0gLavq",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "qExnmzSSQaAaNclI",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/qExnmzSSQaAaNclI",
+          "cachedResultName": "PC Build Workspace — Scrape Website"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        608,
+        0
+      ],
+      "id": "dd6145b0-b3e1-40ee-8594-4074156cec6e",
+      "name": "Execute Scraper Workfow",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        -176
+      ],
+      "id": "48e2a1be-6a38-4b0a-9e55-d39982db5623",
+      "name": "Manually Execute"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        336,
+        0
+      ],
+      "id": "8a298a8f-76a3-4c74-b3f2-4322ee13e45b",
+      "name": "Loop"
+    },
+    {
+      "parameters": {
+        "content": "- Get Clients from google sheet\n- Execute Scrape Website workflow for each client in parallel",
+        "height": 320,
+        "width": 880,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        96,
+        -96
+      ],
+      "typeVersion": 1,
+      "id": "c0fa5e66-b7b8-4501-a3b7-d82a4d95ed3f",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Overview\n\n- This workflow runs automatically every Monday at 1:00 AM.\n- It can also be triggered manually whenever required.\n\n## How it works\n\n- The workflow fetches the list of clients.\n- For each client, the website scraping workflow is triggered and executed in parallel.",
+        "height": 464,
+        "width": 384
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -688,
+        -192
+      ],
+      "typeVersion": 1,
+      "id": "b1173a63-4ddc-4ffc-b779-def8c482a076",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        816,
+        0
+      ],
+      "id": "2a03e9fe-5e02-4cff-b14b-60e4bfff610d",
+      "name": "Wait 5 Seconds",
+      "webhookId": "f3689a4e-7797-4462-b644-f3508b3db832"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Clients": {
+      "main": [
+        [
+          {
+            "node": "Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Scraper Workfow": {
+      "main": [
+        [
+          {
+            "node": "Wait 5 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manually Execute": {
+      "main": [
+        [
+          {
+            "node": "Get Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Execute Scraper Workfow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 5 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "sVQkmMB3SK6Sub4d"
+  },
+  "versionId": "b0d09825-1956-4fa6-8c04-60ea880f4036",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "43fdc4c0ab73fda698a9f2922b57105f2719afb9285814bdf9ce1aaa3267e374"
+  },
+  "id": "UCr4ld4IRZ8f7IpW",
+  "tags": []
+}
